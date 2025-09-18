@@ -120,17 +120,16 @@
 //!   * Lars Strojny
 //!   * EvModder
 
-
 #[cfg(any(not(target_os = "windows"), all(target_os = "windows", target_env = "msvc")))]
 extern crate cc;
 #[cfg(not(target_os = "windows"))]
 extern crate memchr;
+extern crate rustc_version;
+extern crate toml;
 #[cfg(all(target_os = "windows", target_env = "msvc"))]
 extern crate vswhom;
 #[cfg(all(target_os = "windows", target_env = "msvc"))]
 extern crate winreg;
-extern crate rustc_version;
-extern crate toml;
 
 #[cfg(not(target_os = "windows"))]
 mod non_windows;
@@ -146,20 +145,18 @@ use self::windows_msvc::*;
 #[cfg(all(target_os = "windows", not(target_env = "msvc")))]
 use self::windows_not_msvc::*;
 
-use std::{env, fs};
-use std::ffi::OsStr;
 use std::borrow::Cow;
-use std::process::Command;
-use toml::Table as TomlTable;
+use std::ffi::OsStr;
 use std::fmt::{self, Display};
 use std::path::{Path, PathBuf};
-
+use std::process::Command;
+use std::{env, fs};
+use toml::Table as TomlTable;
 
 /// Empty slice, properly-typed for [`compile()`] and `compile_for*()`'s macro list.
 ///
 /// Rust helpfully forbids default type parameters on functions, so just passing `[]` doesn't work :)
 pub const NONE: &[&OsStr] = &[];
-
 
 /// Result of [`compile()`] and `compile_for*()`
 ///
@@ -184,9 +181,7 @@ impl CompilationResult {
     /// `Ok(())` if `NotWindows`, `Ok`, or `NotAttempted`; `Err(self)` if `Failed`
     pub fn manifest_optional(self) -> Result<(), CompilationResult> {
         match self {
-            CompilationResult::NotWindows |
-            CompilationResult::Ok |
-            CompilationResult::NotAttempted(..) => Ok(()),
+            CompilationResult::NotWindows | CompilationResult::Ok | CompilationResult::NotAttempted(..) => Ok(()),
             err @ CompilationResult::Failed(..) => Err(err),
         }
     }
@@ -194,10 +189,8 @@ impl CompilationResult {
     /// `Ok(())` if `NotWindows`, `Ok`; `Err(self)` if `NotAttempted` or `Failed`
     pub fn manifest_required(self) -> Result<(), CompilationResult> {
         match self {
-            CompilationResult::NotWindows |
-            CompilationResult::Ok => Ok(()),
-            err @ CompilationResult::NotAttempted(..) |
-            err @ CompilationResult::Failed(..) => Err(err),
+            CompilationResult::NotWindows | CompilationResult::Ok => Ok(()),
+            err @ CompilationResult::NotAttempted(..) | err @ CompilationResult::Failed(..) => Err(err),
         }
     }
 }
@@ -228,7 +221,6 @@ macro_rules! try_compile_impl {
         }
     };
 }
-
 
 /// Compile the Windows resource file and update the cargo search path if building for Windows.
 ///
@@ -279,7 +271,8 @@ where
             eprintln!("Couldn't parse Cargo.toml: {}; assuming src/main.rs or S_ISDIR(src/bin/)", err);
             TomlTable::new()
         })
-        .contains_key("bin") || (Path::new("src/main.rs").exists() || Path::new("src/bin").is_dir());
+        .contains_key("bin")
+        || (Path::new("src/main.rs").exists() || Path::new("src/bin").is_dir());
     eprintln!("Final verdict: crate has binaries: {}", hasbins);
 
     if hasbins && rustc_version::version().expect("couldn't get rustc version") >= rustc_version::Version::new(1, 50, 0) {
@@ -406,10 +399,15 @@ where
             Err(CompilationResult::NotAttempted(missing))
         }
     } else {
-        let prefix = &resource_file.file_stem().expect("resource_file has no stem").to_str().expect("resource_file's stem not UTF-8");
+        let prefix = &resource_file
+            .file_stem()
+            .expect("resource_file has no stem")
+            .to_str()
+            .expect("resource_file's stem not UTF-8");
         let out_dir = env::var("OUT_DIR").expect("No OUT_DIR env var");
 
-        let out_file = comp.compile_resource(&out_dir, prefix, resource_file.to_str().expect("resource_file not UTF-8"), macros, include_dirs)
+        let out_file = comp
+            .compile_resource(&out_dir, prefix, resource_file.to_str().expect("resource_file not UTF-8"), macros, include_dirs)
             .map_err(CompilationResult::Failed)?;
         Ok((prefix, out_dir, out_file))
     }
@@ -421,7 +419,6 @@ fn apply_macros<'t, Ms: AsRef<OsStr>, Mi: IntoIterator<Item = Ms>>(to: &'t mut C
     }
     to
 }
-
 
 /// Find MSVC build tools other than the compiler and linker
 ///

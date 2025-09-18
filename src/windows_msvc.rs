@@ -1,19 +1,17 @@
-use std::path::{PathBuf, Path, MAIN_SEPARATOR};
-use std::sync::atomic::Ordering::SeqCst;
-use std::sync::atomic::AtomicBool;
 use self::super::apply_macros;
-use std::process::Command;
-use vswhom::VsFindResult;
 use std::borrow::Cow;
-use winreg::enums::*;
 use std::ffi::OsStr;
+use std::path::{Path, PathBuf, MAIN_SEPARATOR};
+use std::process::Command;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::Ordering::SeqCst;
 use std::{env, fs};
+use vswhom::VsFindResult;
 use winreg;
-
+use winreg::enums::*;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceCompiler;
-
 
 impl ResourceCompiler {
     #[inline(always)]
@@ -43,7 +41,7 @@ impl ResourceCompiler {
         let out_file = format!("{}{}{}.lib", out_dir, MAIN_SEPARATOR, prefix);
         // `.res`es are linkable under MSVC as well as normal libraries.
         let mut cmd = Command::new(find_windows_sdk_tool_impl("rc.exe").as_ref().map_or(Path::new("rc.exe"), Path::new));
-        cmd.args(&["/fo", &out_file, "/I", out_dir]);
+        cmd.args(["/fo", &out_file, "/I", out_dir]);
         for dir in include_dirs {
             cmd.arg("/I").arg(dir);
         }
@@ -52,13 +50,13 @@ impl ResourceCompiler {
             .arg(resource)
             .status()
             .map_err(|_| Cow::from("Are you sure you have RC.EXE in your $PATH?"))?
-            .success() {
+            .success()
+        {
             return Err("RC.EXE failed to compile specified resource file".into());
         }
         Ok(out_file)
     }
 }
-
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 enum Arch {
@@ -69,7 +67,7 @@ enum Arch {
 
 pub fn find_windows_sdk_tool_impl(tool: &str) -> Option<PathBuf> {
     let arch = match env::var("HOST").expect("No HOST env var").as_bytes() {
-        [b'x', b'8', b'6', b'_', b'6', b'4', ..] => Arch::X64, // "x86_64"
+        [b'x', b'8', b'6', b'_', b'6', b'4', ..] => Arch::X64,           // "x86_64"
         [b'a', b'a', b'r', b'c', b'h', b'6', b'4', ..] => Arch::AArch64, // "aarch64"
         _ => Arch::X86,
     };
@@ -81,7 +79,6 @@ pub fn find_windows_sdk_tool_impl(tool: &str) -> Option<PathBuf> {
         .or_else(|| find_latest_windows_sdk_tool(arch, tool))
         .or_else(|| find_with_vswhom(arch, tool))
 }
-
 
 fn find_with_vswhom(arch: Arch, tool: &str) -> Option<PathBuf> {
     let res = VsFindResult::search();
@@ -138,7 +135,7 @@ fn find_windows_10_kits_tool(key: &str, arch: Arch, tool: &str) -> Option<PathBu
     include_windows_10_kits(&kit_root);
     let root_dir = kit_root + "/bin";
 
-    for entry in fs::read_dir(&root_dir).ok()?.filter(|d| d.is_ok()).map(Result::unwrap) {
+    for entry in fs::read_dir(&root_dir).ok()?.flatten() {
         let fname = entry.file_name().into_string();
         let ftype = entry.file_type();
         if fname.is_err() || ftype.is_err() || ftype.unwrap().is_file() {
@@ -146,12 +143,15 @@ fn find_windows_10_kits_tool(key: &str, arch: Arch, tool: &str) -> Option<PathBu
         }
 
         let fname = entry.file_name().into_string().unwrap();
-        if let Some(rc) = try_bin_dir(root_dir.clone(),
-                                      &format!("{}/x86", fname),
-                                      &format!("{}/x64", fname),
-                                      &format!("{}/arm64", fname),
-                                      arch)
-            .and_then(|pb| try_tool(pb, tool)) {
+        if let Some(rc) = try_bin_dir(
+            root_dir.clone(),
+            &format!("{}/x86", fname),
+            &format!("{}/x64", fname),
+            &format!("{}/arm64", fname),
+            arch,
+        )
+        .and_then(|pb| try_tool(pb, tool))
+        {
             return Some(rc);
         }
     }
@@ -173,10 +173,12 @@ fn include_windows_10_kits(kit_root: &str) {
 
         if let Ok(include_root) = fs::read_dir(kit_root.to_string() + r"\Include\") {
             get_dirs(include_root).filter_map(|dir| fs::read_dir(dir.path()).ok()).for_each(|dir| {
-                get_dirs(dir).for_each(|sub_dir| if let Some(sub_dir) = sub_dir.path().to_str() {
-                    if !include.contains(sub_dir) {
-                        include.push_str(sub_dir);
-                        include.push(';');
+                get_dirs(dir).for_each(|sub_dir| {
+                    if let Some(sub_dir) = sub_dir.path().to_str() {
+                        if !include.contains(sub_dir) {
+                            include.push_str(sub_dir);
+                            include.push(';');
+                        }
                     }
                 })
             });
@@ -194,7 +196,9 @@ fn include_windows_10_kits(kit_root: &str) {
 }
 
 fn get_dirs(read_dir: fs::ReadDir) -> impl Iterator<Item = fs::DirEntry> {
-    read_dir.filter_map(|dir| dir.ok()).filter(|dir| dir.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
+    read_dir
+        .filter_map(|dir| dir.ok())
+        .filter(|dir| dir.file_type().map(|ft| ft.is_dir()).unwrap_or(false))
 }
 
 fn try_bin_dir<R: Into<PathBuf>>(root_dir: R, x86_bin: &str, x64_bin: &str, aarch64_bin: &str, arch: Arch) -> Option<PathBuf> {
@@ -217,5 +221,9 @@ fn try_bin_dir_impl(mut root_dir: PathBuf, x86_bin: &str, x64_bin: &str, aarch64
 
 fn try_tool(mut pb: PathBuf, tool: &str) -> Option<PathBuf> {
     pb.push(tool);
-    if pb.exists() { Some(pb) } else { None }
+    if pb.exists() {
+        Some(pb)
+    } else {
+        None
+    }
 }

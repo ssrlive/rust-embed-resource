@@ -26,6 +26,10 @@ jobs:
           toolchain: ${{ matrix.rust_version }}
           targets: ${{ matrix.target }}
 
+      - run: rustup component add rustfmt clippy
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --target ${{ matrix.target }} -- -D warnings
+
       - run: pip install "pefile==2024.8.26"
       - run: cargo build --verbose --release --target ${{ matrix.target }} --workspace
 
@@ -56,6 +60,8 @@ jobs:
           toolchain: ${{ matrix.rust_version }}
       - run: rustup component add rustfmt clippy
 
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo build --verbose --release --workspace
       - run: cargo test --verbose --release
 
@@ -99,6 +105,9 @@ jobs:
       - run: rustup component add rustfmt clippy
 
       - run: pip install "pefile==2024.8.26"
+
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --target ${{ matrix.target }} -- -D warnings
 
       - run: cargo build --verbose --release --workspace --target ${{ matrix.target }}
       - run: cargo test --verbose --release --target ${{ matrix.target }}

@@ -1,11 +1,10 @@
-use std::process::{Command, Stdio};
-use std::path::{PathBuf, Path};
 use self::super::apply_macros;
-use std::{env, fs, mem};
+use memchr::memmem;
 use std::borrow::Cow;
 use std::ffi::OsStr;
-use memchr::memmem;
-
+use std::path::{Path, PathBuf};
+use std::process::{Command, Stdio};
+use std::{env, fs, mem};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceCompiler {
@@ -42,17 +41,19 @@ impl ResourceCompiler {
         Is: AsRef<OsStr>,
         IsIter: IntoIterator<Item = Is>,
     {
-        self.compiler.as_ref().expect("Not supported but we got to compile_resource()?").compile(out_dir, prefix, resource, macros, include_dirs)
+        self.compiler
+            .as_ref()
+            .expect("Not supported but we got to compile_resource()?")
+            .compile(out_dir, prefix, resource, macros, include_dirs)
     }
 }
-
 
 #[derive(Debug, Copy, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 enum CompilerType {
     /// LLVM-RC
     ///
     /// Requires a separate C preprocessor step on the source RC file
-    LlvmRc { has_no_preprocess: bool, },
+    LlvmRc { has_no_preprocess: bool },
     /// MinGW windres
     WindRes,
 }
@@ -67,9 +68,10 @@ impl Compiler {
     pub fn probe() -> Result<Compiler, Cow<'static, str>> {
         let target = env::var("TARGET").map_err(|_| Cow::from("no $TARGET"))?;
 
-        if let Ok(rc) = env::var(&format!("RC_{}", target))
-            .or_else(|_| env::var(&format!("RC_{}", target.replace('-', "_"))))
-            .or_else(|_| env::var("RC")) {
+        if let Ok(rc) = env::var(format!("RC_{target}"))
+            .or_else(|_| env::var(format!("RC_{}", target.replace('-', "_"))))
+            .or_else(|_| env::var("RC"))
+        {
             return guess_compiler_variant(&rc);
         }
 
@@ -127,31 +129,36 @@ impl Compiler {
                 for dir in include_dirs {
                     cc_build.include(Path::new(dir.as_ref()));
                 }
-                fs::write(&preprocessed_path,
-                          cc_xc(apply_macros_cc(&mut cc_build, macros))
-                              .file(resource)
-                              .cargo_metadata(false)
-                              .include(out_dir)
-                              .expand()).map_err(|e| e.to_string())?;
+                fs::write(
+                    &preprocessed_path,
+                    cc_xc(apply_macros_cc(&mut cc_build, macros))
+                        .file(resource)
+                        .cargo_metadata(false)
+                        .include(out_dir)
+                        .expand(),
+                )
+                .map_err(|e| e.to_string())?;
 
-                try_command(Command::new(&self.executable[..])
-                                .args(&["/fo", &out_file])
-                                .args(&["/C", "65001"]) // UTF-8, cf. https://github.com/nabijaczleweli/rust-embed-resource/pull/73
-                                .args(if has_no_preprocess {
-                                    // We already preprocessed using CC. llvm-rc preprocessing
-                                    // requires having clang in PATH, which more exotic toolchains
-                                    // may not necessarily have.
-                                    &["/no-preprocess"][..]
-                                } else {
-                                    &[][..]
-                                })
-                                .args(&["--", &preprocessed_path])
-                                .stdin(Stdio::piped())
-                                .current_dir(or_curdir(Path::new(resource).parent().expect("Resource parent nonexistent?"))),
-                            Path::new(&self.executable[..]),
-                            "compile",
-                            &preprocessed_path,
-                            &out_file)?;
+                try_command(
+                    Command::new(&self.executable[..])
+                        .args(["/fo", &out_file])
+                        .args(["/C", "65001"]) // UTF-8, cf. https://github.com/nabijaczleweli/rust-embed-resource/pull/73
+                        .args(if has_no_preprocess {
+                            // We already preprocessed using CC. llvm-rc preprocessing
+                            // requires having clang in PATH, which more exotic toolchains
+                            // may not necessarily have.
+                            &["/no-preprocess"][..]
+                        } else {
+                            &[][..]
+                        })
+                        .args(["--", &preprocessed_path])
+                        .stdin(Stdio::piped())
+                        .current_dir(or_curdir(Path::new(resource).parent().expect("Resource parent nonexistent?"))),
+                    Path::new(&self.executable[..]),
+                    "compile",
+                    &preprocessed_path,
+                    &out_file,
+                )?;
             }
             CompilerType::WindRes => {
                 let mut cmd = Command::new(&self.executable[..]);
@@ -159,18 +166,20 @@ impl Compiler {
                 for dir in include_dirs {
                     cmd.arg("--include-dir").arg(dir);
                 }
-                try_command(apply_macros(&mut cmd, "-D", macros),
-                            Path::new(&self.executable[..]),
-                            "compile",
-                            resource,
-                            &out_file)?;
+                try_command(
+                    apply_macros(&mut cmd, "-D", macros),
+                    Path::new(&self.executable[..]),
+                    "compile",
+                    resource,
+                    &out_file,
+                )?;
             }
         }
         Ok(out_file)
     }
 }
 
-fn apply_macros_cc<'t, Ms: AsRef<OsStr>, Mi: IntoIterator<Item = Ms>>(to: &'t mut cc::Build, macros: Mi) -> &'t mut cc::Build {
+fn apply_macros_cc<Ms: AsRef<OsStr>, Mi: IntoIterator<Item = Ms>>(to: &mut cc::Build, macros: Mi) -> &mut cc::Build {
     for m in macros {
         let mut m = m.as_ref().to_str().expect("macros must be UTF-8 in this configuration").splitn(2, '=');
         to.define(m.next().unwrap(), m.next());
@@ -207,7 +216,7 @@ fn or_curdir(directory: &Path) -> &Path {
 /// /? will print the help in LLVM-RC and Microsoft RC.EXE.
 /// If combined, /? takes precedence over -V.
 fn guess_compiler_variant(s: &str) -> Result<Compiler, Cow<'static, str>> {
-    match Command::new(s).args(&["-V", "/?"]).output() {
+    match Command::new(s).args(["-V", "/?"]).output() {
         Ok(out) => {
             if out.stdout.starts_with(b"GNU windres") {
                 Ok(Compiler {
@@ -217,7 +226,9 @@ fn guess_compiler_variant(s: &str) -> Result<Compiler, Cow<'static, str>> {
             } else if out.stdout.starts_with(b"OVERVIEW: Resource Converter") || out.stdout.starts_with(b"OVERVIEW: LLVM Resource Converter") {
                 Ok(Compiler {
                     executable: s.to_string().into(),
-                    tp: CompilerType::LlvmRc { has_no_preprocess: memmem::find(&out.stdout, b"no-preprocess").is_some() },
+                    tp: CompilerType::LlvmRc {
+                        has_no_preprocess: memmem::find(&out.stdout, b"no-preprocess").is_some(),
+                    },
                 })
             } else {
                 Err(format!("Unknown RC compiler variant: {}", s).into())
@@ -226,7 +237,6 @@ fn guess_compiler_variant(s: &str) -> Result<Compiler, Cow<'static, str>> {
         Err(err) => Err(format!("Couldn't execute {}: {}", s, err).into()),
     }
 }
-
 
 fn is_runnable(s: &str) -> bool {
     Command::new(s).spawn().map(|mut c| c.kill()).is_ok()

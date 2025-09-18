@@ -1,14 +1,12 @@
-use std::path::{PathBuf, MAIN_SEPARATOR};
 use self::super::apply_macros;
-use std::process::Command;
 use std::borrow::Cow;
-use std::ffi::OsStr;
 use std::env;
-
+use std::ffi::OsStr;
+use std::path::{PathBuf, MAIN_SEPARATOR};
+use std::process::Command;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ResourceCompiler;
-
 
 impl ResourceCompiler {
     #[inline(always)]
@@ -41,13 +39,13 @@ impl ResourceCompiler {
         // GNU windres or llvm-windres (clang32, clang64, or clangarm64)
         let target = env::var_os("MINGW_CHOST").map(Cow::Owned).unwrap_or_else(|| {
             OsStr::new(match env::var("TARGET").expect("No TARGET env var").as_bytes() {
-                    [b'x', b'8', b'6', b'_', b'6', b'4', ..] => "pe-x86-64", // "x86_64"
-                    [b'a', b'a', b'r', b'c', b'h', b'6', b'4', ..] => "pe-aarch64-little", // "aarch64"
-                    // windres has "pe-aarch64-little" in the strings but doesn't actually accept it on my machine,
-                    // llvm-windres only has i686 and amd64; still unported
-                    _ => "pe-i386",
-                })
-                .into()
+                [b'x', b'8', b'6', b'_', b'6', b'4', ..] => "pe-x86-64",               // "x86_64"
+                [b'a', b'a', b'r', b'c', b'h', b'6', b'4', ..] => "pe-aarch64-little", // "aarch64"
+                // windres has "pe-aarch64-little" in the strings but doesn't actually accept it on my machine,
+                // llvm-windres only has i686 and amd64; still unported
+                _ => "pe-i386",
+            })
+            .into()
         });
 
         let mut cmd = Command::new("windres");
@@ -65,7 +63,6 @@ impl ResourceCompiler {
         }
     }
 }
-
 
 pub fn find_windows_sdk_tool_impl(_: &str) -> Option<PathBuf> {
     None
