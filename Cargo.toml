@@ -6,7 +6,7 @@ readme = "README.md"
 keywords = ["cargo", "build", "windows", "resource", "manifest"]
 categories = ["development-tools", "os::windows-apis"]
 license = "MIT"
-edition = "2015"
+edition = "2024"
 # Remember to also update in appveyor.yml
 # Remember to also update in src/lib.rs ~L40 (Cargo.toml example)
 # Remember to also update in README

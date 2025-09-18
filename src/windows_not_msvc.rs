@@ -2,7 +2,7 @@ use self::super::apply_macros;
 use std::borrow::Cow;
 use std::env;
 use std::ffi::OsStr;
-use std::path::{PathBuf, MAIN_SEPARATOR};
+use std::path::{MAIN_SEPARATOR, PathBuf};
 use std::process::Command;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]

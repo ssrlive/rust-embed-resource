@@ -1,13 +1,12 @@
 use self::super::apply_macros;
 use std::borrow::Cow;
 use std::ffi::OsStr;
-use std::path::{Path, PathBuf, MAIN_SEPARATOR};
+use std::path::{MAIN_SEPARATOR, Path, PathBuf};
 use std::process::Command;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::Ordering::SeqCst;
 use std::{env, fs};
 use vswhom::VsFindResult;
-use winreg;
 use winreg::enums::*;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
@@ -38,7 +37,7 @@ impl ResourceCompiler {
         Is: AsRef<OsStr>,
         IsIter: IntoIterator<Item = Is>,
     {
-        let out_file = format!("{}{}{}.lib", out_dir, MAIN_SEPARATOR, prefix);
+        let out_file = format!("{out_dir}{MAIN_SEPARATOR}{prefix}.lib");
         // `.res`es are linkable under MSVC as well as normal libraries.
         let mut cmd = Command::new(find_windows_sdk_tool_impl("rc.exe").as_ref().map_or(Path::new("rc.exe"), Path::new));
         cmd.args(["/fo", &out_file, "/I", out_dir]);
@@ -145,9 +144,9 @@ fn find_windows_10_kits_tool(key: &str, arch: Arch, tool: &str) -> Option<PathBu
         let fname = entry.file_name().into_string().unwrap();
         if let Some(rc) = try_bin_dir(
             root_dir.clone(),
-            &format!("{}/x86", fname),
-            &format!("{}/x64", fname),
-            &format!("{}/arm64", fname),
+            &format!("{fname}/x86"),
+            &format!("{fname}/x64"),
+            &format!("{fname}/arm64"),
             arch,
         )
         .and_then(|pb| try_tool(pb, tool))
@@ -174,6 +173,7 @@ fn include_windows_10_kits(kit_root: &str) {
         if let Ok(include_root) = fs::read_dir(kit_root.to_string() + r"\Include\") {
             get_dirs(include_root).filter_map(|dir| fs::read_dir(dir.path()).ok()).for_each(|dir| {
                 get_dirs(dir).for_each(|sub_dir| {
+                    #[allow(clippy::collapsible_if)]
                     if let Some(sub_dir) = sub_dir.path().to_str() {
                         if !include.contains(sub_dir) {
                             include.push_str(sub_dir);
@@ -184,6 +184,7 @@ fn include_windows_10_kits(kit_root: &str) {
             });
         }
 
+        #[allow(clippy::collapsible_if)]
         if let Some(cl) = cc::windows_registry::find_tool(env::var("TARGET").expect("No TARGET env var").as_str(), "cl.exe") {
             if let Some((_, ipaths)) = cl.env().iter().find(|(k, _)| k == "INCLUDE") {
                 include.push_str(ipaths.to_str().expect("%INCLUDE% from cc nonrepresentable"));
@@ -191,7 +192,7 @@ fn include_windows_10_kits(kit_root: &str) {
             }
         }
 
-        env::set_var("INCLUDE", include);
+        unsafe { env::set_var("INCLUDE", include) };
     }
 }
 
@@ -212,18 +213,10 @@ fn try_bin_dir_impl(mut root_dir: PathBuf, x86_bin: &str, x64_bin: &str, aarch64
         Arch::AArch64 => root_dir.push(aarch64_bin),
     }
 
-    if root_dir.is_dir() {
-        Some(root_dir)
-    } else {
-        None
-    }
+    if root_dir.is_dir() { Some(root_dir) } else { None }
 }
 
 fn try_tool(mut pb: PathBuf, tool: &str) -> Option<PathBuf> {
     pb.push(tool);
-    if pb.exists() {
-        Some(pb)
-    } else {
-        None
-    }
+    if pb.exists() { Some(pb) } else { None }
 }

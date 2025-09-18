@@ -263,25 +263,25 @@ where
     let (prefix, out_dir, out_file) = try_compile_impl!(compile_impl(resource_file.as_ref(), macros, include_dirs));
     let hasbins = fs::read_to_string("Cargo.toml")
         .unwrap_or_else(|err| {
-            eprintln!("Couldn't read Cargo.toml: {}; assuming src/main.rs or S_ISDIR(src/bin/)", err);
+            eprintln!("Couldn't read Cargo.toml: {err}; assuming src/main.rs or S_ISDIR(src/bin/)");
             String::new()
         })
         .parse::<TomlTable>()
         .unwrap_or_else(|err| {
-            eprintln!("Couldn't parse Cargo.toml: {}; assuming src/main.rs or S_ISDIR(src/bin/)", err);
+            eprintln!("Couldn't parse Cargo.toml: {err}; assuming src/main.rs or S_ISDIR(src/bin/)");
             TomlTable::new()
         })
         .contains_key("bin")
         || (Path::new("src/main.rs").exists() || Path::new("src/bin").is_dir());
-    eprintln!("Final verdict: crate has binaries: {}", hasbins);
+    eprintln!("Final verdict: crate has binaries: {hasbins}");
 
     if hasbins && rustc_version::version().expect("couldn't get rustc version") >= rustc_version::Version::new(1, 50, 0) {
-        println!("cargo:rustc-link-arg-bins={}", out_file);
+        println!("cargo:rustc-link-arg-bins={out_file}");
     } else {
         // Cargo pre-0.51.0 (rustc pre-1.50.0) compat
         // Only links to the calling crate's library
-        println!("cargo:rustc-link-search=native={}", out_dir);
-        println!("cargo:rustc-link-lib=dylib={}", prefix);
+        println!("cargo:rustc-link-search=native={out_dir}");
+        println!("cargo:rustc-link-lib=dylib={prefix}");
     }
     CompilationResult::Ok
 }
@@ -313,7 +313,7 @@ where
 {
     let (_, _, out_file) = try_compile_impl!(compile_impl(resource_file.as_ref(), macros, include_dirs));
     for bin in for_bins {
-        println!("cargo:rustc-link-arg-bin={}={}", bin, out_file);
+        println!("cargo:rustc-link-arg-bin={bin}={out_file}");
     }
     CompilationResult::Ok
 }
@@ -331,7 +331,7 @@ where
     IsIter: IntoIterator<Item = Is>,
 {
     let (_, _, out_file) = try_compile_impl!(compile_impl(resource_file.as_ref(), macros, include_dirs));
-    println!("cargo:rustc-link-arg-tests={}", out_file);
+    println!("cargo:rustc-link-arg-tests={out_file}");
     CompilationResult::Ok
 }
 
@@ -347,7 +347,7 @@ where
     IsIter: IntoIterator<Item = Is>,
 {
     let (_, _, out_file) = try_compile_impl!(compile_impl(resource_file.as_ref(), macros, include_dirs));
-    println!("cargo:rustc-link-arg-benches={}", out_file);
+    println!("cargo:rustc-link-arg-benches={out_file}");
     CompilationResult::Ok
 }
 
@@ -363,7 +363,7 @@ where
     IsIter: IntoIterator<Item = Is>,
 {
     let (_, _, out_file) = try_compile_impl!(compile_impl(resource_file.as_ref(), macros, include_dirs));
-    println!("cargo:rustc-link-arg-examples={}", out_file);
+    println!("cargo:rustc-link-arg-examples={out_file}");
     CompilationResult::Ok
 }
 
@@ -380,7 +380,7 @@ where
     IsIter: IntoIterator<Item = Is>,
 {
     let (_, _, out_file) = try_compile_impl!(compile_impl(resource_file.as_ref(), macros, include_dirs));
-    println!("cargo:rustc-link-arg={}", out_file);
+    println!("cargo:rustc-link-arg={out_file}");
     CompilationResult::Ok
 }
 

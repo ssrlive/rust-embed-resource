@@ -120,10 +120,10 @@ impl Compiler {
         Is: AsRef<OsStr>,
         IsIter: IntoIterator<Item = Is>,
     {
-        let out_file = format!("{}/{}.lib", out_dir, prefix);
+        let out_file = format!("{out_dir}/{prefix}.lib");
         match self.tp {
             CompilerType::LlvmRc { has_no_preprocess } => {
-                let preprocessed_path = format!("{}/{}-preprocessed.rc", out_dir, prefix);
+                let preprocessed_path = format!("{out_dir}/{prefix}-preprocessed.rc");
                 let mut cc_build = cc::Build::new();
                 cc_build.define("RC_INVOKED", None);
                 for dir in include_dirs {
@@ -205,11 +205,7 @@ fn try_command(cmd: &mut Command, exec: &Path, action: &str, whom: &str, whre: &
 }
 
 fn or_curdir(directory: &Path) -> &Path {
-    if directory == Path::new("") {
-        Path::new(".")
-    } else {
-        directory
-    }
+    if directory == Path::new("") { Path::new(".") } else { directory }
 }
 
 /// -V will print the version in windres.
@@ -231,10 +227,10 @@ fn guess_compiler_variant(s: &str) -> Result<Compiler, Cow<'static, str>> {
                     },
                 })
             } else {
-                Err(format!("Unknown RC compiler variant: {}", s).into())
+                Err(format!("Unknown RC compiler variant: {s}").into())
             }
         }
-        Err(err) => Err(format!("Couldn't execute {}: {}", s, err).into()),
+        Err(err) => Err(format!("Couldn't execute {s}: {err}").into()),
     }
 }
 
